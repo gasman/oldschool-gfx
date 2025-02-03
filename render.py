@@ -190,8 +190,7 @@ subprocess.run([
     "ffmpeg",
     "-y",
     "-f", "concat", "-i", playlist_filename,
-    "-pix_fmt", "yuv420p",
-    "-c:v", "ffv1",
+    "-c", "copy",
     concat_filename,
 ])
 
@@ -211,4 +210,3 @@ subprocess.run([
 for path in Path().iterdir():
     if path.name.startswith(TEMP_FILE_PREFIX):
         path.unlink(filename)
- 
