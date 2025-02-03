@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
 import json
-import os
 import re
 import subprocess
 import sys
+from pathlib import Path
 from PIL import Image
 
 OUTPUT_SIZE = (1920, 1080)
@@ -24,7 +24,7 @@ TEMP_FILE_PREFIX = "RENDERTEMP-"
 FRAME_RATE = None
 
 
-def check_video_metadata(filename):
+def check_video_metadata(path):
     global FRAME_RATE
     # check that resolution matches OUTPUT_SIZE
     ffprobe = subprocess.run([
@@ -32,7 +32,7 @@ def check_video_metadata(filename):
         "-v", "quiet",
         "-print_format", "json",
         "-show_streams",
-        filename
+        str(path),
     ], stdout=subprocess.PIPE)
     video_data = json.loads(ffprobe.stdout)
     video_stream_data = None
@@ -42,7 +42,7 @@ def check_video_metadata(filename):
             break
 
     if video_stream_data is None:
-        raise Exception(f"No video stream found in {filename}")
+        raise Exception(f"No video stream found in {path.name}")
 
     video_size = (video_stream_data['width'], video_stream_data['height'])
     if video_size != OUTPUT_SIZE:
@@ -56,15 +56,14 @@ def check_video_metadata(filename):
         raise Exception(f"Found multiple videos with different frame rates - {FRAME_RATE} vs {frame_rate}")
 
 
-def convert_slide(filename, duration, frame_rate):
-    file_root, file_ext = os.path.splitext(filename)
+def convert_slide(path, duration, frame_rate):
     img = None
 
-    if file_ext in recoil_image_extensions:
+    if path.suffix in recoil_image_extensions:
         from recoil import RecoilImage
-        img = RecoilImage(filename).to_pil()
-    elif file_ext in image_extensions:
-        img = Image.open(filename)
+        img = RecoilImage(str(path)).to_pil()
+    elif path.suffix in image_extensions:
+        img = Image.open(str(path))
 
     if img:
         img = img.convert('RGB')
@@ -99,10 +98,10 @@ def convert_slide(filename, duration, frame_rate):
             (target_height - output_height) // 2,
         ))
 
-        output_image_filename = f"{TEMP_FILE_PREFIX}{file_root}.png"
+        output_image_filename = f"{TEMP_FILE_PREFIX}{path.stem}.png"
         final_img.save(output_image_filename)
 
-        output_video_filename = f"{TEMP_FILE_PREFIX}{file_root}.mkv"
+        output_video_filename = f"{TEMP_FILE_PREFIX}{path.stem}.mkv"
 
         subprocess.run([
             "ffmpeg",
@@ -117,14 +116,14 @@ def convert_slide(filename, duration, frame_rate):
         ])
 
         return output_video_filename
-    elif file_ext in video_extensions:
-        output_video_filename = f"{TEMP_FILE_PREFIX}{file_root}.mkv"
+    elif path.suffix in video_extensions:
+        output_video_filename = f"{TEMP_FILE_PREFIX}{path.stem}.mkv"
 
         subprocess.run([
             "ffmpeg",
             "-y",
             "-r", str(frame_rate),
-            "-i", filename,
+            "-i", str(path),
             "-t", str(duration),
             "-pix_fmt", "yuv420p",
             "-c:v", "ffv1",
@@ -133,44 +132,47 @@ def convert_slide(filename, duration, frame_rate):
 
         return output_video_filename
     else:
-        raise Exception(f"Unrecognised file type {file_ext}: {filename!r}")
+        raise Exception(f"Unrecognised file type {path.suffix}: {path.name!r}")
 
 
-pic_filename = None
-workstage_filenames = []
+workdir = Path(sys.argv[1])
+if not workdir.is_dir():
+    raise Exception(f"{workdir} is not a valid directory name")
 
-for filename in os.listdir('.'):
-    if not re.match(r'(P|W\d)-', filename):
+pic_path = None
+workstage_paths = []
+
+for path in workdir.iterdir():
+    if not re.match(r'(P|W\d+)-', path.name):
         continue
-    if not os.path.isfile(filename):
+    if not path.is_file():
         continue
 
-    if filename.startswith('P'):
-        if pic_filename:
+    if path.name.startswith('P'):
+        if pic_path:
             raise Exception("Multiple picture (P-foo.png) files found")
-        pic_filename = filename
+        pic_path = path
 
-    elif filename.startswith('W'):
-        workstage_filenames.append(filename)
+    elif path.name.startswith('W'):
+        workstage_paths.append(path)
 
-if not pic_filename:
+if not pic_path:
     raise Exception("No picture (P-foo.png) file found")
 
-workstage_filenames.sort()
+workstage_paths.sort(key=lambda path: path.name)
 
-all_filenames = [pic_filename] + workstage_filenames
+all_paths = [pic_path] + workstage_paths
 
-for filename in all_filenames:
-    file_root, file_ext = os.path.splitext(filename)
-    if file_ext in video_extensions:
-        check_video_metadata(filename)
+for path in all_paths:
+    if path.suffix in video_extensions:
+        check_video_metadata(path)
 
 # fall back on DEFAULT_FRAME_RATE if no videos were provided as input
 final_frame_rate = FRAME_RATE or DEFAULT_FRAME_RATE
 
-pic_out_filename = convert_slide(pic_filename, 10, final_frame_rate)
+pic_out_filename = convert_slide(pic_path, 10, final_frame_rate)
 workstage_out_filenames = [
-    convert_slide(filename, 5, final_frame_rate) for filename in workstage_filenames
+    convert_slide(path, 5, final_frame_rate) for path in workstage_paths
 ]
 
 playlist_filename = f"{TEMP_FILE_PREFIX}playlist.txt"
@@ -190,9 +192,10 @@ subprocess.run([
     "-f", "concat", "-i", playlist_filename,
     "-pix_fmt", "yuv420p",
     "-c:v", "ffv1",
-    concat_filename
+    concat_filename,
 ])
 
+final_video_filename = f"00-{workdir.name}.mp4"
 subprocess.run([
     "ffmpeg",
     "-y",
@@ -201,11 +204,11 @@ subprocess.run([
     "-c:v", "libx264",
     "-profile:v", "high",
     "-b:v", "10M",
-    sys.argv[1]
+    final_video_filename,
 ])
 
 # delete temp files
-for filename in os.listdir('.'):
-    if filename.startswith(TEMP_FILE_PREFIX):
-        os.remove(filename)
+for path in Path().iterdir():
+    if path.name.startswith(TEMP_FILE_PREFIX):
+        path.unlink(filename)
  
