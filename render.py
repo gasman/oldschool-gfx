@@ -42,18 +42,18 @@ def check_video_metadata(filename):
             break
 
     if video_stream_data is None:
-        raise Exception("No video stream found in %s" % filename)
+        raise Exception(f"No video stream found in {filename}")
 
     video_size = (video_stream_data['width'], video_stream_data['height'])
     if video_size != OUTPUT_SIZE:
-        raise Exception("Incorrect video dimensions - expected %r, got %r" % (OUTPUT_SIZE, video_size))
+        raise Exception(f"Incorrect video dimensions - expected {OUTPUT_SIZE!r}, got {video_size!r}")
 
     (frame_rate_num, frame_rate_denom) = video_stream_data['r_frame_rate'].split('/')
     frame_rate = int(frame_rate_num) / int(frame_rate_denom)
     if FRAME_RATE is None:
         FRAME_RATE = frame_rate
     elif FRAME_RATE != frame_rate:
-        raise Exception("Found multiple videos with different frame rates - %d vs %d" % (FRAME_RATE, frame_rate))
+        raise Exception(f"Found multiple videos with different frame rates - {FRAME_RATE} vs {frame_rate}")
 
 
 def convert_slide(filename, duration, frame_rate):
@@ -99,10 +99,10 @@ def convert_slide(filename, duration, frame_rate):
             (target_height - output_height) // 2,
         ))
 
-        output_image_filename = '%s%s.png' % (TEMP_FILE_PREFIX, file_root)
+        output_image_filename = f"{TEMP_FILE_PREFIX}{file_root}.png"
         final_img.save(output_image_filename)
 
-        output_video_filename = '%s%s.mkv' % (TEMP_FILE_PREFIX, file_root)
+        output_video_filename = f"{TEMP_FILE_PREFIX}{file_root}.mkv"
 
         subprocess.run([
             "ffmpeg",
@@ -118,7 +118,7 @@ def convert_slide(filename, duration, frame_rate):
 
         return output_video_filename
     elif file_ext in video_extensions:
-        output_video_filename = '%s%s.mkv' % (TEMP_FILE_PREFIX, file_root)
+        output_video_filename = f"{TEMP_FILE_PREFIX}{file_root}.mkv"
 
         subprocess.run([
             "ffmpeg",
@@ -133,7 +133,7 @@ def convert_slide(filename, duration, frame_rate):
 
         return output_video_filename
     else:
-        raise Exception("Unrecognised file type %s: %r" % (file_ext, filename))
+        raise Exception(f"Unrecognised file type {file_ext}: {filename!r}")
 
 
 pic_filename = None
@@ -173,16 +173,16 @@ workstage_out_filenames = [
     convert_slide(filename, 5, final_frame_rate) for filename in workstage_filenames
 ]
 
-playlist_filename = '%splaylist.txt' % TEMP_FILE_PREFIX
+playlist_filename = f"{TEMP_FILE_PREFIX}playlist.txt"
 
 with open(playlist_filename, 'w') as playlist:
     print("ffconcat version 1.0\n", file=playlist)
-    print("file %s" % pic_out_filename, file=playlist)
+    print(f"file {pic_out_filename}", file=playlist)
     for filename in workstage_out_filenames:
-        print("file %s" % filename, file=playlist)
-    print("file %s" % pic_out_filename, file=playlist)
+        print(f"file {filename}", file=playlist)
+    print(f"file {pic_out_filename}", file=playlist)
 
-concat_filename = '%sconcat.mkv' % TEMP_FILE_PREFIX
+concat_filename = f"{TEMP_FILE_PREFIX}concat.mkv"
 
 subprocess.run([
     "ffmpeg",
