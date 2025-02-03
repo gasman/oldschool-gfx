@@ -173,11 +173,6 @@ workstage_out_filenames = [
     convert_slide(filename, 5, final_frame_rate) for filename in workstage_filenames
 ]
 
-black_img = Image.new('RGB', OUTPUT_SIZE)
-black_img_filename = '%sblack.png' % TEMP_FILE_PREFIX
-black_img.save(black_img_filename)
-black_vid_filename = convert_slide(black_img_filename, 1, final_frame_rate)
-
 playlist_filename = '%splaylist.txt' % TEMP_FILE_PREFIX
 
 with open(playlist_filename, 'w') as playlist:
@@ -186,7 +181,6 @@ with open(playlist_filename, 'w') as playlist:
     for filename in workstage_out_filenames:
         print("file %s" % filename, file=playlist)
     print("file %s" % pic_out_filename, file=playlist)
-    print("file %s" % black_vid_filename, file=playlist)
 
 concat_filename = '%sconcat.mkv' % TEMP_FILE_PREFIX
 
