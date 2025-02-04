@@ -20,6 +20,7 @@ image_extensions = ['.png', '.gif', '.jpg', '.jpeg', '.iff', '.tif', '.pcx']
 video_extensions = ['.mkv', '.mp4', '.avi']
 
 TEMP_FILE_PREFIX = "RENDERTEMP-"
+FONT_FILENAME = "dejavusans.ttf"
 
 FRAME_RATE = None
 
@@ -56,7 +57,7 @@ def check_video_metadata(path):
         raise Exception(f"Found multiple videos with different frame rates - {FRAME_RATE} vs {frame_rate}")
 
 
-def convert_slide(path, duration, frame_rate):
+def convert_slide(path, duration, frame_rate, label=None):
     img = None
 
     if path.suffix in recoil_image_extensions:
@@ -64,6 +65,14 @@ def convert_slide(path, duration, frame_rate):
         img = RecoilImage(str(path)).to_pil()
     elif path.suffix in image_extensions:
         img = Image.open(str(path))
+
+    if label:
+        filter_opts = [
+            "-vf",
+            f"drawtext=text='{label}':fontfile={FONT_FILENAME}:fontcolor=white:fontsize=48:borderw=2:x=w-text_w-40:y=40"
+        ]
+    else:
+        filter_opts = []
 
     if img:
         img = img.convert('RGB')
@@ -112,6 +121,7 @@ def convert_slide(path, duration, frame_rate):
             "-t", str(duration),
             "-pix_fmt", "yuv420p",
             "-c:v", "ffv1",
+            *filter_opts,
             str(output_video_path)
         ])
 
@@ -127,6 +137,7 @@ def convert_slide(path, duration, frame_rate):
             "-t", str(duration),
             "-pix_fmt", "yuv420p",
             "-c:v", "ffv1",
+            *filter_opts,
             str(output_video_path)
         ])
 
@@ -172,7 +183,10 @@ final_frame_rate = FRAME_RATE or DEFAULT_FRAME_RATE
 
 pic_out_path = convert_slide(pic_path, 10, final_frame_rate)
 workstage_out_paths = [
-    convert_slide(path, 5, final_frame_rate) for path in workstage_paths
+    convert_slide(
+        path, 5, final_frame_rate, label=f"Stage {i+1}/{len(workstage_paths)}"
+    )
+    for i, path in enumerate(workstage_paths)
 ]
 
 playlist_path = workdir / f"{TEMP_FILE_PREFIX}playlist.txt"
