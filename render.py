@@ -146,81 +146,83 @@ def convert_slide(path, duration, frame_rate, label=None):
         raise Exception(f"Unrecognised file type {path.suffix}: {path.name!r}")
 
 
-workdir = Path(sys.argv[1])
-if not workdir.is_dir():
-    raise Exception(f"{workdir} is not a valid directory name")
+def convert_entry(workdir):
+    pic_path = None
+    workstage_paths = []
 
-pic_path = None
-workstage_paths = []
+    for path in workdir.iterdir():
+        if not re.match(r'(P|W\d+)-', path.name):
+            continue
+        if not path.is_file():
+            continue
 
-for path in workdir.iterdir():
-    if not re.match(r'(P|W\d+)-', path.name):
-        continue
-    if not path.is_file():
-        continue
+        if path.name.startswith('P'):
+            if pic_path:
+                raise Exception("Multiple picture (P-foo.png) files found")
+            pic_path = path
 
-    if path.name.startswith('P'):
-        if pic_path:
-            raise Exception("Multiple picture (P-foo.png) files found")
-        pic_path = path
+        elif path.name.startswith('W'):
+            workstage_paths.append(path)
 
-    elif path.name.startswith('W'):
-        workstage_paths.append(path)
+    if not pic_path:
+        raise Exception("No picture (P-foo.png) file found")
 
-if not pic_path:
-    raise Exception("No picture (P-foo.png) file found")
+    workstage_paths.sort(key=lambda path: path.name)
 
-workstage_paths.sort(key=lambda path: path.name)
+    all_paths = [pic_path] + workstage_paths
 
-all_paths = [pic_path] + workstage_paths
+    for path in all_paths:
+        if path.suffix in video_extensions:
+            check_video_metadata(path)
 
-for path in all_paths:
-    if path.suffix in video_extensions:
-        check_video_metadata(path)
+    # fall back on DEFAULT_FRAME_RATE if no videos were provided as input
+    final_frame_rate = FRAME_RATE or DEFAULT_FRAME_RATE
 
-# fall back on DEFAULT_FRAME_RATE if no videos were provided as input
-final_frame_rate = FRAME_RATE or DEFAULT_FRAME_RATE
+    pic_out_path = convert_slide(pic_path, 10, final_frame_rate)
+    workstage_out_paths = [
+        convert_slide(
+            path, 5, final_frame_rate, label=f"Stage {i+1}/{len(workstage_paths)}"
+        )
+        for i, path in enumerate(workstage_paths)
+    ]
 
-pic_out_path = convert_slide(pic_path, 10, final_frame_rate)
-workstage_out_paths = [
-    convert_slide(
-        path, 5, final_frame_rate, label=f"Stage {i+1}/{len(workstage_paths)}"
-    )
-    for i, path in enumerate(workstage_paths)
-]
+    playlist_path = workdir / f"{TEMP_FILE_PREFIX}playlist.txt"
 
-playlist_path = workdir / f"{TEMP_FILE_PREFIX}playlist.txt"
+    with playlist_path.open(mode='w') as playlist:
+        print("ffconcat version 1.0\n", file=playlist)
+        print(f"file {pic_out_path.name}", file=playlist)
+        for path in workstage_out_paths:
+            print(f"file {path.name}", file=playlist)
+        print(f"file {pic_out_path.name}", file=playlist)
 
-with playlist_path.open(mode='w') as playlist:
-    print("ffconcat version 1.0\n", file=playlist)
-    print(f"file {pic_out_path.name}", file=playlist)
-    for path in workstage_out_paths:
-        print(f"file {path.name}", file=playlist)
-    print(f"file {pic_out_path.name}", file=playlist)
+    concat_path = workdir / f"{TEMP_FILE_PREFIX}concat.mkv"
 
-concat_path = workdir / f"{TEMP_FILE_PREFIX}concat.mkv"
+    subprocess.run([
+        "ffmpeg",
+        "-y",
+        "-f", "concat", "-i", str(playlist_path),
+        "-c", "copy",
+        str(concat_path),
+    ])
 
-subprocess.run([
-    "ffmpeg",
-    "-y",
-    "-f", "concat", "-i", str(playlist_path),
-    "-c", "copy",
-    str(concat_path),
-])
+    final_video_filename = f"00-{workdir.name}.mp4"
+    subprocess.run([
+        "ffmpeg",
+        "-y",
+        "-i", str(concat_path),
+        "-pix_fmt", "yuv420p",
+        "-c:v", "libx264",
+        "-profile:v", "high",
+        "-b:v", "10M",
+        final_video_filename,
+    ])
 
-final_video_filename = f"00-{workdir.name}.mp4"
-subprocess.run([
-    "ffmpeg",
-    "-y",
-    "-i", str(concat_path),
-    "-pix_fmt", "yuv420p",
-    "-c:v", "libx264",
-    "-profile:v", "high",
-    "-b:v", "10M",
-    final_video_filename,
-])
+    # delete temp files
+    for path in workdir.iterdir():
+        if path.name.startswith(TEMP_FILE_PREFIX):
+            path.unlink()
 
-# delete temp files
-for path in workdir.iterdir():
-    if path.name.startswith(TEMP_FILE_PREFIX):
-        path.unlink()
+for dirname in sys.argv[1:]:
+    workdir = Path(dirname)
+    if workdir.is_dir():
+        convert_entry(workdir)
