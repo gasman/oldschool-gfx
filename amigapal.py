@@ -58,6 +58,11 @@ for filename in sys.argv[1:]:
     if not flat_palette:
         img = img.quantize(dither=Image.NONE, colors=32)
 
+    if path.suffix in recoil_image_extensions:
+        # save a PNG of the original image for reference
+        orig_outfile = f"{path.stem}.ORIG.png"
+        img.save(orig_outfile)
+
     fixed_palette = [round(c / 17) * 17 for c in img.getpalette('RGB')]
     img.putpalette(fixed_palette, 'RGB')
     outfile = f"{path.stem}.OCS.png"
