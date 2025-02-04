@@ -28,3 +28,9 @@ This will output a video `00-0123-mygreatpicture.mp4` with the following propert
 * 1080p, h264 high profile
 * same framerate as the source video, or 25fps if all sources are images
 * source images scaled with integer nearest-neighbour rescaling if there's an integer multiple that covers >=80% of the target width or height, or the Hamming algorithm scaled to full width or height if not.
+
+## Bonus round: amigapal.py
+
+Tests whether an image fits Amiga OCS limitations: max 320x256 and 32 colours, with all colours representable in 4-bit RGB (#112233 or #102030). Run: `./amigapal.py image1.iff image2.png`
+
+If the palette uses non-OCS colours, a fixed version will be saved as `image1.OCS.png`.
