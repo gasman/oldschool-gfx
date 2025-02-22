@@ -74,6 +74,8 @@ def convert_slide(path, duration, frame_rate, label=None):
     else:
         filter_opts = []
 
+    clean_stem = re.sub(r'\W+', '_', path.stem)
+
     if img:
         img = img.convert('RGB')
         input_width, input_height = img.size
@@ -107,10 +109,10 @@ def convert_slide(path, duration, frame_rate, label=None):
             (target_height - output_height) // 2,
         ))
 
-        output_image_path = path.parent / f"{TEMP_FILE_PREFIX}{path.stem}.png"
+        output_image_path = path.parent / f"{TEMP_FILE_PREFIX}{clean_stem}.png"
         final_img.save(str(output_image_path))
 
-        output_video_path = path.parent / f"{TEMP_FILE_PREFIX}{path.stem}.mkv"
+        output_video_path = path.parent / f"{TEMP_FILE_PREFIX}{clean_stem}.mkv"
 
         subprocess.run([
             "ffmpeg",
@@ -127,7 +129,7 @@ def convert_slide(path, duration, frame_rate, label=None):
 
         return output_video_path
     elif path.suffix in video_extensions:
-        output_video_path = path.parent / f"{TEMP_FILE_PREFIX}{path.stem}.mkv"
+        output_video_path = path.parent / f"{TEMP_FILE_PREFIX}{clean_stem}.mkv"
 
         subprocess.run([
             "ffmpeg",
