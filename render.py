@@ -14,6 +14,8 @@ OUTPUT_SIZE = (1920, 1080)
 MIN_SCALED_SIZE = 0.8
 
 DEFAULT_FRAME_RATE = 25
+FINAL_DURATION = 10
+WORKSTAGE_DURATION = 2
 
 recoil_image_extensions = ['.iff', '.lbm', '.pic']
 image_extensions = ['.png', '.gif', '.jpg', '.jpeg', '.iff', '.tif', '.pcx']
@@ -180,10 +182,10 @@ def convert_entry(workdir):
     # fall back on DEFAULT_FRAME_RATE if no videos were provided as input
     final_frame_rate = FRAME_RATE or DEFAULT_FRAME_RATE
 
-    pic_out_path = convert_slide(pic_path, 10, final_frame_rate)
+    pic_out_path = convert_slide(pic_path, FINAL_DURATION, final_frame_rate)
     workstage_out_paths = [
         convert_slide(
-            path, 5, final_frame_rate, label=f"Stage {i+1}/{len(workstage_paths)}"
+            path, WORKSTAGE_DURATION, final_frame_rate, label=f"Stage {i+1}/{len(workstage_paths)}"
         )
         for i, path in enumerate(workstage_paths)
     ]
