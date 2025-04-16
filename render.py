@@ -171,7 +171,8 @@ def convert_entry(workdir):
     if not pic_path:
         raise Exception("No picture (P-foo.png) file found")
 
-    workstage_paths.sort(key=lambda path: path.name)
+    # extract number after W and sort on it
+    workstage_paths.sort(key=lambda path: int(path.name[1:].split('-')[0]))
 
     all_paths = [pic_path] + workstage_paths
 
